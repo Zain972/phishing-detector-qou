@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>كاشف رسائل التصيد الاحتيالي</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;
+  --border:rgba(99,255,180,0.15);--border2:rgba(99,255,180,0.3);
+  --green:#63ffb4;--green-dim:rgba(99,255,180,0.1);
+  --red:#ff6b6b;--red-dim:rgba(255,107,107,0.1);
+  --amber:#ffd166;--amber-dim:rgba(255,209,102,0.1);
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --font:'IBM Plex Sans Arabic',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+.grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(99,255,180,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(99,255,180,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.glow{position:fixed;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(99,255,180,0.06) 0%,transparent 70%);top:-200px;right:-200px;pointer-events:none;z-index:0}
+.container{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:3rem 2rem}
+header{text-align:center;margin-bottom:3rem}
+.badge{display:inline-flex;align-items:center;gap:8px;background:var(--green-dim);border:1px solid var(--border2);color:var(--green);font-size:12px;font-family:var(--mono);padding:6px 14px;border-radius:100px;margin-bottom:1.5rem;letter-spacing:.05em}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+h1{font-size:2.8rem;font-weight:700;line-height:1.2;margin-bottom:1rem;background:linear-gradient(135deg,#fff 0%,var(--green) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{color:var(--text2);font-size:1.05rem;max-width:520px;margin:0 auto;line-height:1.7}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem;transition:border-color .3s}
+.card:hover{border-color:var(--border2)}
+.card-label{font-size:11px;font-family:var(--mono);color:var(--green);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem}
+textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font);font-size:.95rem;line-height:1.7;padding:1rem 1.25rem;resize:vertical;min-height:170px;transition:border-color .3s,box-shadow .3s;outline:none;direction:rtl}
+textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(99,255,180,.08)}
+textarea::placeholder{color:var(--text3)}
+.examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:1rem;align-items:center}
+.example-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-family:var(--font);font-size:12px;padding:5px 12px;border-radius:100px;cursor:pointer;transition:all .2s}
+.example-btn:hover{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.analyze-btn{width:100%;background:var(--green);color:#0a0e1a;border:none;border-radius:12px;font-family:var(--font);font-size:1rem;font-weight:700;padding:1rem;cursor:pointer;transition:all .2s;margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:10px}
+.analyze-btn:hover{background:#8affcc;transform:translateY(-1px);box-shadow:0 8px 30px rgba(99,255,180,.25)}
+.analyze-btn:active{transform:translateY(0)}
+.analyze-btn:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
+.spinner{width:18px;height:18px;border:2px solid rgba(0,0,0,.2);border-top-color:#0a0e1a;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+#result-section{display:none;animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.verdict-card{border-radius:16px;padding:2rem;margin-bottom:1.5rem;border:1px solid}
+.verdict-safe{background:rgba(99,255,180,.05);border-color:rgba(99,255,180,.3)}
+.verdict-phishing{background:rgba(255,107,107,.05);border-color:rgba(255,107,107,.3)}
+.verdict-suspicious{background:rgba(255,209,102,.05);border-color:rgba(255,209,102,.3)}
+.verdict-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem}
+.verdict-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.icon-safe{background:rgba(99,255,180,.15)}
+.icon-phishing{background:rgba(255,107,107,.15)}
+.icon-suspicious{background:rgba(255,209,102,.15)}
+.verdict-title{font-size:1.6rem;font-weight:700}
+.verdict-safe .verdict-title{color:var(--green)}
+.verdict-phishing .verdict-title{color:var(--red)}
+.verdict-suspicious .verdict-title{color:var(--amber)}
+.verdict-subtitle{color:var(--text2);font-size:.9rem;margin-top:3px}
+.score-bar-wrap{margin-bottom:1.5rem}
+.score-label{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:8px;font-family:var(--mono)}
+.score-track{height:10px;background:var(--bg3);border-radius:100px;overflow:hidden}
+.score-fill{height:100%;border-radius:100px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.fill-safe{background:linear-gradient(90deg,#63ffb4,#00e5ff)}
+.fill-phishing{background:linear-gradient(90deg,#ff6b6b,#ff3860)}
+.fill-suspicious{background:linear-gradient(90deg,#ffd166,#ff9f43)}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.5rem}
+.stat-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center}
+.stat-val{font-size:1.4rem;font-weight:700;font-family:var(--mono)}
+.stat-lbl{font-size:11px;color:var(--text3);margin-top:4px}
+.indicators-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.indicator{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:flex-start;gap:10px}
+.ind-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ind-red{background:var(--red)}
+.ind-green{background:var(--green)}
+.ind-amber{background:var(--amber)}
+.ind-text{font-size:13px;color:var(--text2);line-height:1.5}
+.ind-label{font-weight:600;color:var(--text);font-size:13px;margin-bottom:3px}
+.analysis-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1.25rem;font-size:.93rem;line-height:1.8;color:var(--text2)}
+.analysis-box p{margin-bottom:.5rem}
+.analysis-box p:last-child{margin-bottom:0}
+.tip-card{border-radius:12px;padding:1.25rem 1.5rem;font-size:.9rem;color:var(--text2);line-height:1.7;border:1px solid;margin-bottom:1.5rem}
+.algo-badge{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text3);font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:100px;margin-top:.75rem}
+footer{text-align:center;padding:2rem 0 1rem;color:var(--text3);font-size:12px;font-family:var(--mono);border-top:1px solid var(--border);margin-top:2rem}
+@media(max-width:600px){h1{font-size:2rem}.stats-row{grid-template-columns:1fr}.container{padding:2rem 1rem}}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow"></div>
+<div class="container">
+
+  <header>
+    <div class="badge"><div class="dot"></div>Offline AI Engine — يعمل بدون إنترنت</div>
+    <h1>كاشف رسائل التصيد الاحتيالي</h1>
+    <p class="subtitle">يحلل الرسالة محلياً باستخدام خوارزميات ذكية — مجاني بالكامل ولا يحتاج API</p>
+  </header>
+
+  <div class="card">
+    <div class="card-label">// أدخل نص الرسالة</div>
+    <textarea id="emailText" placeholder="الصق هنا نص الإيميل أو الرسالة التي تريد تحليلها...&#10;&#10;مثال: عزيزي العميل، تم اختراق حسابك. اضغط هنا لتأكيد هويتك فوراً..."></textarea>
+    <div class="examples">
+      <span style="font-size:12px;color:var(--text3)">أمثلة:</span>
+      <button class="example-btn" onclick="loadEx('phishing1')">تصيد بنكي</button>
+      <button class="example-btn" onclick="loadEx('phishing2')">جائزة وهمية</button>
+      <button class="example-btn" onclick="loadEx('phishing3')">تصيد واتساب</button>
+      <button class="example-btn" onclick="loadEx('suspicious')">مشبوهة</button>
+      <button class="example-btn" onclick="loadEx('safe')">آمنة</button>
+    </div>
+    <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">
+      <div class="spinner" id="spinner"></div>
+      <span id="btnText">🔍 تحليل الرسالة</span>
+    </button>
+  </div>
+
+  <div id="result-section">
+    <div class="verdict-card" id="verdictCard">
+      <div class="verdict-header">
+        <div class="verdict-icon" id="verdictIcon"></div>
+        <div>
+          <div class="verdict-title" id="verdictTitle"></div>
+          <div class="verdict-subtitle" id="verdictSubtitle"></div>
+        </div>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-label">
+          <span>مستوى الخطر</span>
+          <span id="scoreText">0%</span>
+        </div>
+        <div class="score-track">
+          <div class="score-fill" id="scoreFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="stats-row" id="statsRow"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">// المؤشرات المكتشفة</div>
+      <div class="indicators-grid" id="indicators"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">// التحليل التفصيلي</div>
+      <div class="analysis-box" id="analysisText"></div>
+      <div class="algo-badge">⚙ Rule-based NLP Engine v2.0 — تحليل محلي بدون إنترنت</div>
+    </div>
+
+    <div class="tip-card" id="tipCard"></div>
+  </div>
+
+  <footer>Phishing Detector v2.0 — Offline JS Engine — مسار الباحث — AI Security Project</footer>
+</div>
+
+<script>
+const examples = {
+  phishing1:`عزيزي العميل الكريم،\n\nنحيطكم علماً بأنه تم رصد نشاط مشبوه على حسابكم البنكي. لحماية أموالكم، يرجى تأكيد هويتكم خلال 24 ساعة وإلا سيتم تجميد الحساب فوراً.\n\nاضغط على الرابط التالي: http://secure-bank-verify.xyz/login\n\nستحتاج لإدخال: رقم الحساب، كلمة المرور، رقم البطاقة الائتمانية، الرقم السري.\n\nالبنك الوطني للخدمات المصرفية`,
+  phishing2:`تهانينا!! لقد فزت بجائزة 50,000 دولار!!\n\nأنت الفائز المحظوظ في سحب اليانصيب العالمي. لاستلام جائزتك يجب عليك:\n1. إرسال رسوم التسجيل 200 دولار\n2. إرسال صورة جواز سفرك وبطاقة هويتك\n3. تقديم معلومات حسابك البنكي\n\nتواصل معنا: winner@lottery-prize.ru\nلا تتأخر! العرض ينتهي خلال 48 ساعة!`,
+  phishing3:`رسالة عاجلة من واتساب الرسمي:\n\nحسابك سيُحذف خلال 24 ساعة بسبب انتهاك الشروط. لتجنب الحذف اضغط فوراً على الرابط وأدخل رقم هاتفك وكود التحقق:\nhttp://whatsapp-verify.tk/confirm?id=838291\n\nفريق واتساب الرسمي`,
+  suspicious:`صديقي العزيز،\n\nوجدت طريقة لكسب المال بسرعة من المنزل! أنا أكسب 500 دولار يومياً. كل ما تحتاجه هو التسجيل عبر رابطي:\nhttp://bit.ly/earn-fast-2024\n\nلا تخبر أحداً لأن الأماكن محدودة!`,
+  safe:`مرحباً أحمد،\n\nأرجو مراجعة التقرير المرفق قبل اجتماع الغد الساعة العاشرة صباحاً. يتضمن ملخص أداء الفريق للربع الثالث وخطة العمل للربع القادم.\n\nإذا كان لديك أي تعليقات يرجى إرسالها قبل نهاية اليوم.\n\nمع التحية،\nسارة - مديرة المشاريع`
+};
+
+function loadEx(k){
+  document.getElementById('emailText').value = examples[k];
+  document.getElementById('result-section').style.display = 'none';
+}
+
+// ===== محرك التحليل الذكي =====
+const RULES = [
+  {
+    id:'urgency_ar',
+    words:['فوراً','عاجل','خلال 24 ساعة','خلال 48 ساعة','سيتم تجميد','سيُحذف','لا تتأخر','الآن فوراً','سارع','قبل فوات الأوان','ينتهي'],
+    score:25, label:'إلحاح زائف', detail:'الرسالة تستخدم ضغط الوقت لإجبارك على التصرف دون تفكير', type:'red', stat:'urgency'
+  },
+  {
+    id:'urgency_en',
+    words:['urgent','immediately','24 hours','48 hours','act now','limited time','expires','suspended','account will be'],
+    score:20, label:'Urgent language detected', detail:'رسالة تستخدم الإلحاح بالإنجليزية لإجبارك على التصرف بسرعة', type:'red', stat:'urgency'
+  },
+  {
+    id:'suspicious_links',
+    pattern:/https?:\/\/[^\s]+\.(xyz|tk|ru|cc|top|club|online|site|pw|biz|info)[^\s]*/gi,
+    score:30, label:'روابط بنطاقات خطيرة', detail:'الرسالة تحتوي روابط بامتدادات عالية الخطورة (.xyz .tk .ru .cc)', type:'red', stat:'links'
+  },
+  {
+    id:'shorteners',
+    pattern:/https?:\/\/(bit\.ly|tinyurl|goo\.gl|ow\.ly|rb\.gy|cutt\.ly|t\.ly)[^\s]*/gi,
+    score:20, label:'روابط مختصرة مشبوهة', detail:'مختصرات الروابط تخفي الوجهة الحقيقية وتُستخدم في الاحتيال', type:'amber', stat:'links'
+  },
+  {
+    id:'ip_links',
+    pattern:/https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g,
+    score:35, label:'رابط بعنوان IP مباشر', detail:'المواقع الشرعية لا تستخدم عناوين IP — هذا مؤشر قوي على الاحتيال', type:'red', stat:'links'
+  },
+  {
+    id:'credentials',
+    words:['كلمة المرور','الرقم السري','بطاقة الائتمان','رقم الحساب','رقم البطاقة','CVV','PIN','password','credit card','card number'],
+    score:25, label:'طلب بيانات حساسة', detail:'الجهات الرسمية لا تطلب كلمات المرور أو بيانات البطاقة عبر الإيميل', type:'red', stat:'personalInfo'
+  },
+  {
+    id:'money_promises',
+    words:['فزت','جائزة','مليون','ألف دولار','كسب المال','عرض حصري','اليانصيب','winner','prize','lottery','free money','earn fast'],
+    score:20, label:'وعود مالية مشبوهة', detail:'وعود مالية مبالغ فيها هي علامة كلاسيكية لرسائل الاحتيال', type:'red', stat:null
+  },
+  {
+    id:'impersonation',
+    words:['واتساب الرسمي','البنك الوطني','PayPal','Apple Support','Microsoft','Google Security','فريق أمازون','إدارة المنصة','فريق فيسبوك'],
+    score:15, label:'انتحال هوية جهة موثوقة', detail:'المحتال يتظاهر بأنه جهة رسمية معروفة لكسب ثقتك', type:'amber', stat:null
+  },
+  {
+    id:'personal_docs',
+    words:['جواز السفر','بطاقة الهوية','أرسل صورة','صورة الجواز','أكد هويتك','تحقق من هويتك','passport','national id','send photo'],
+    score:20, label:'طلب وثائق شخصية', detail:'طلب إرسال صور الهوية والجواز عبر الإيميل أمر خطير جداً', type:'red', stat:'personalInfo'
+  },
+  {
+    id:'secrecy',
+    words:['لا تخبر أحداً','سري','احتفظ بالسر','لا تشارك هذا','tell no one','keep secret','do not share','confidential'],
+    score:20, label:'طلب الكتمان والسرية', detail:'الجهات الشرعية لا تطلب منك إخفاء التواصل معها', type:'red', stat:null
+  },
+  {
+    id:'fees',
+    words:['رسوم التسجيل','رسوم المعالجة','ادفع أولاً','حول مبلغ','رسوم الشحن','registration fee','processing fee','send money first','transfer fee'],
+    score:25, label:'طلب دفع رسوم مسبقة', detail:'طلب دفع رسوم "لاستلام جائزة" هو فخ احتيال كلاسيكي', type:'red', stat:null
+  },
+  {
+    id:'exclamation',
+    pattern:/!{2,}/g,
+    score:8, label:'استخدام مبالغ في علامات التعجب', detail:'الرسائل الرسمية لا تستخدم علامات تعجب متعددة متتالية', type:'amber', stat:null
+  }
+];
+
+const POSITIVE_RULES = [
+  {words:['مع التحية','تحياتي','شكراً لك','برجاء مراجعة','اجتماع','تقرير مرفق','خطة العمل'],score:-15,label:'أسلوب مهني رسمي',detail:'الرسالة تستخدم صيغة احترافية ومهنية',type:'green'},
+  {words:['مدير','مديرة','قسم','إدارة','شركة','مؤسسة'],score:-8,label:'مرسل من جهة محددة',detail:'الرسالة تُعرّف بوضوح بالمرسل والجهة',type:'green'}
+];
+
+function analyzeText(text){
+  const t = text.toLowerCase();
+  let score = 0;
+  const found = [];
+  const stats = {urgency:false, links:false, personalInfo:false};
+
+  for(const rule of RULES){
+    let triggered = false;
+    if(rule.words){
+      triggered = rule.words.some(w => t.includes(w.toLowerCase()) || text.includes(w));
+    }
+    if(!triggered && rule.pattern){
+      const m = text.match(rule.pattern);
+      triggered = !!(m && m.length > 0);
+    }
+    if(triggered){
+      score += rule.score;
+      found.push({label:rule.label, detail:rule.detail, type:rule.type});
+      if(rule.stat) stats[rule.stat] = true;
+    }
+  }
+
+  for(const pos of POSITIVE_RULES){
+    const hit = pos.words.some(w => text.includes(w));
+    if(hit){
+      score += pos.score;
+      found.push({label:pos.label, detail:pos.detail, type:pos.type});
+    }
+  }
+
+  if(found.filter(f=>f.type==='red').length === 0 && score <= 5){
+    found.push({label:'لا توجد مؤشرات خطيرة واضحة',detail:'لم يتم رصد علامات تصيد في هذه الرسالة',type:'green'});
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const verdict = score >= 45 ? 'phishing' : score >= 18 ? 'suspicious' : 'safe';
+
+  const redCount = found.filter(f=>f.type==='red').length;
+  const amberCount = found.filter(f=>f.type==='amber').length;
+
+  let analysis = '';
+  if(verdict==='phishing'){
+    analysis = `رصد النظام ${redCount} مؤشر خطير يؤكد بقوة أن هذه رسالة تصيد احتيالي.`;
+    if(stats.urgency) analysis += ` تستخدم أسلوب الضغط النفسي عبر الإلحاح الزمني لمنعك من التفكير.`;
+    if(stats.links) analysis += ` تحتوي على روابط مشبوهة قد تقودك لمواقع تسرق بياناتك.`;
+    if(stats.personalInfo) analysis += ` تطلب معلومات حساسة لا تطلبها الجهات الرسمية عبر الإيميل أبداً.`;
+    analysis += ` يُنصح بشدة بحذف هذه الرسالة فوراً وعدم التفاعل معها.`;
+  } else if(verdict==='suspicious'){
+    analysis = `رصد النظام ${redCount + amberCount} مؤشر يستوجب الحذر.`;
+    analysis += ` بعض عناصر الرسالة تتطابق مع أنماط رسائل التصيد الشائعة.`;
+    analysis += ` يُنصح بالتحقق من هوية المرسل عبر قنوات رسمية قبل الرد أو الضغط على أي رابط.`;
+  } else {
+    analysis = `لم يتم رصد مؤشرات خطيرة واضحة في هذه الرسالة.`;
+    analysis += ` تبدو ذات طابع مهني أو شخصي طبيعي.`;
+    analysis += ` مع ذلك، تبقى اليقظة ضرورية دائماً — لا تضغط على روابط غير متوقعة حتى من مصادر موثوقة.`;
+  }
+
+  const tips = {
+    phishing:'لا تضغط على أي رابط في هذه الرسالة. إذا كانت تدّعي أنها من بنكك، اتصل بالبنك مباشرة على الرقم الرسمي في بطاقتك.',
+    suspicious:'تحقق من هوية المرسل قبل التصرف. اكتب عنوان الموقع الرسمي بنفسك في المتصفح بدلاً من الضغط على الروابط.',
+    safe:'رغم أن الرسالة تبدو آمنة، لا تشارك أبداً كلمات مرورك أو بياناتك البنكية عبر الإيميل مهما كان المصدر.'
+  };
+
+  return {verdict, score, indicators:found, analysis, tip:tips[verdict], stats};
+}
+
+function analyze(){
+  const text = document.getElementById('emailText').value.trim();
+  if(!text){ alert('الرجاء إدخال نص الرسالة أولاً'); return; }
+
+  const btn = document.getElementById('analyzeBtn');
+  const spinner = document.getElementById('spinner');
+  const btnText = document.getElementById('btnText');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  btnText.textContent = 'جارٍ التحليل...';
+  document.getElementById('result-section').style.display = 'none';
+
+  setTimeout(() => {
+    const result = analyzeText(text);
+    displayResult(result);
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    btnText.textContent = '🔍 تحليل الرسالة';
+  }, 800);
+}
+
+function displayResult(r){
+  const section = document.getElementById('result-section');
+  const card = document.getElementById('verdictCard');
+  const icon = document.getElementById('verdictIcon');
+  const title = document.getElementById('verdictTitle');
+  const subtitle = document.getElementById('verdictSubtitle');
+  const fill = document.getElementById('scoreFill');
+  const scoreText = document.getElementById('scoreText');
+
+  const cfg = {
+    phishing:{cls:'verdict-phishing',iconCls:'icon-phishing',emoji:'🚨',title:'تصيد احتيالي مؤكد',sub:'هذه الرسالة خطيرة — لا تتفاعل معها أبداً',fillCls:'fill-phishing'},
+    suspicious:{cls:'verdict-suspicious',iconCls:'icon-suspicious',emoji:'⚠️',title:'رسالة مشبوهة',sub:'تحتوي مؤشرات مثيرة للقلق — توخَّ الحذر',fillCls:'fill-suspicious'},
+    safe:{cls:'verdict-safe',iconCls:'icon-safe',emoji:'✅',title:'رسالة آمنة',sub:'لم يتم رصد علامات تصيد واضحة',fillCls:'fill-safe'}
+  }[r.verdict];
+
+  card.className = 'verdict-card ' + cfg.cls;
+  icon.className = 'verdict-icon ' + cfg.iconCls;
+  icon.textContent = cfg.emoji;
+  title.textContent = cfg.title;
+  subtitle.textContent = cfg.sub;
+
+  fill.className = 'score-fill ' + cfg.fillCls;
+  fill.style.width = '0%';
+  scoreText.textContent = '0%';
+  setTimeout(() => {
+    fill.style.width = r.score + '%';
+    scoreText.textContent = r.score + '%';
+  }, 150);
+
+  const col = {phishing:'var(--red)',suspicious:'var(--amber)',safe:'var(--green)'}[r.verdict];
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-box">
+      <div class="stat-val" style="color:${r.stats.urgency?'var(--red)':'var(--green)'}">${r.stats.urgency?'⚠':'✓'}</div>
+      <div class="stat-lbl">إلحاح زائف</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:${r.stats.links?'var(--red)':'var(--green)'}">${r.stats.links?'🔗':'✓'}</div>
+      <div class="stat-lbl">روابط مشبوهة</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" style="color:${r.stats.personalInfo?'var(--red)':'var(--green)'}">${r.stats.personalInfo?'⚠':'✓'}</div>
+      <div class="stat-lbl">طلب بيانات حساسة</div>
+    </div>`;
+
+  const dotCls = {red:'ind-red',green:'ind-green',amber:'ind-amber'};
+  document.getElementById('indicators').innerHTML = r.indicators.map(ind=>`
+    <div class="indicator">
+      <div class="ind-dot ${dotCls[ind.type]||'ind-amber'}"></div>
+      <div><div class="ind-label">${ind.label}</div><div class="ind-text">${ind.detail}</div></div>
+    </div>`).join('');
+
+  document.getElementById('analysisText').innerHTML = r.analysis.split('. ').filter(Boolean).map(s=>`<p>${s.trim()}${s.trim().endsWith('.')?'':'.'}</p>`).join('');
+
+  const tipCard = document.getElementById('tipCard');
+  tipCard.innerHTML = `<strong style="color:${col}">💡 نصيحة أمنية:</strong> ${r.tip}`;
+  tipCard.style.background = r.verdict==='phishing'?'var(--red-dim)':r.verdict==='suspicious'?'var(--amber-dim)':'var(--green-dim)';
+  tipCard.style.borderColor = col;
+
+  section.style.display = 'block';
+  section.scrollIntoView({behavior:'smooth',block:'start'});
+}
+</script>
+</body>
+</html>
